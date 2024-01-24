@@ -1,4 +1,5 @@
-FROM node:lts-alpine3.18
+# Stage 1: Build stage
+FROM node:14 AS build
 
 WORKDIR /usr/src/app
 
@@ -6,12 +7,29 @@ RUN apk add --no-cache dumb-init
 
 COPY package*.json ./
 
-RUN npm ci --only=production
+RUN npm install
 
 COPY . .
 
+RUN npm run build
+
+# Stage 2: Production stage
+FROM node:14-alpine
+
+WORKDIR /usr/src/app
+
+COPY --from=build /usr/src/app/dist ./dist
+COPY package*.json ./
+
+RUN npm install --only=production
+
 ENV NODE_ENV=production
+ENV PORT=3000
 
-EXPOSE 3001
+RUN addgroup -g 1001 -S nodejs && adduser -S -u 1001 -G nodejs nodejs
 
-CMD ["dumb-init", "node", "server.js"]
+USER nodejs
+
+EXPOSE 3000
+
+CMD ["dumb-init", "npm", "start"]
